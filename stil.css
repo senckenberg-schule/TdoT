@@ -1,0 +1,34 @@
+/* Gemeinsame Gestaltung: Schulfarben Blau und Rot auf Weiß, Milchglas-Panels */
+:root{
+  color-scheme: light;
+  --blau:#1c4a8f;
+  --blau-tief:#0f2d5c;
+  --blau-hell:#dfe9f7;
+  --rot:#d3253a;
+  --rot-dunkel:#b81d31;
+  --weiss:#ffffff;
+  --grund:#eef3fa;
+  --text:#132339;
+  --leise:#5a6a82;
+  --linie:#c9d6ea;
+  --glas:rgba(255,255,255,.64);
+  --glas-rand:rgba(255,255,255,.88);
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"Figtree","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--grund);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--rot);outline-offset:2px}
+[hidden]{display:none!important}
+
+.glas{background:var(--glas);border:1px solid var(--glas-rand);border-radius:22px;
+  backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
+  box-shadow:0 20px 50px -25px rgba(15,45,92,.45)}
+
+.vorschau-hinweis{position:fixed;left:50%;transform:translateX(-50%);top:max(10px,env(safe-area-inset-top,0px));z-index:50;
+  background:var(--rot);color:var(--weiss);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:5px 12px;border-radius:999px;pointer-events:none}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

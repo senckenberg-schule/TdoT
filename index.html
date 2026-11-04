@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Willkommen an der JCS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="stil.css">
+<style>
+body{min-height:100vh;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(24px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.karte{max-width:460px;margin:0 auto;background:var(--weiss);border-radius:28px;border:1px solid var(--linie);box-shadow:0 30px 60px -30px rgba(15,45,92,.35);overflow:hidden}
+.kopf{background:var(--blau);color:var(--weiss);padding:26px 22px 22px;position:relative;overflow:hidden}
+.kopf::after{content:"";position:absolute;right:-40px;top:-40px;width:140px;height:140px;border-radius:50%;border:18px solid var(--rot)}
+.kopf small{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;font-weight:600;max-width:24ch}
+.kopf h1{font-family:var(--display);font-size:28px;line-height:1.1;margin:8px 0;text-wrap:balance;max-width:14ch;position:relative;z-index:1}
+.kopf p{margin:0;font-size:14px;opacity:.92;max-width:32ch}
+form{padding:20px 22px 24px;display:flex;flex-direction:column;gap:24px}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+legend{font-family:var(--display);font-weight:700;font-size:17px;margin-bottom:10px;padding:0}
+legend em{font-style:normal;font-family:var(--body);font-weight:500;font-size:13px;color:var(--leise);display:block}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer;width:100%;height:100%}
+.chip span{display:inline-block;padding:8px 13px;border-radius:999px;border:1.5px solid var(--linie);font-weight:600;font-size:14px;background:var(--weiss);transition:background .15s,border-color .15s,color .15s}
+.chip input:checked + span{background:var(--blau);border-color:var(--blau);color:var(--weiss)}
+.chip input:focus-visible + span{outline:3px solid var(--rot);outline-offset:2px}
+.feld{width:100%;padding:12px 14px;border-radius:14px;border:1.5px solid var(--linie);background:var(--grund);font-size:16px}
+.feld:focus{border-color:var(--blau);outline:none;background:var(--weiss)}
+.senden{background:var(--rot);color:var(--weiss);border:0;border-radius:16px;padding:15px;font-weight:700;font-size:17px;cursor:pointer}
+.senden:hover{background:var(--rot-dunkel)}
+.senden:disabled{opacity:.6;cursor:wait}
+.klein{font-size:12px;color:var(--leise);text-align:center;margin:-10px 0 0}
+.fehler{color:var(--rot);font-size:14px;font-weight:600;margin:0}
+.versteckt{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.danke{padding:44px 24px 36px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
+.danke b{font-family:var(--display);font-size:26px;color:var(--blau-tief)}
+.danke p{margin:0;max-width:30ch;color:var(--leise)}
+.pin{width:58px;height:58px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--rot);box-shadow:inset 0 0 0 15px var(--rot),inset 0 0 0 23px var(--weiss);animation:fall .7s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes fall{from{transform:translateY(-60px) rotate(-45deg);opacity:0}to{transform:rotate(-45deg);opacity:1}}
+.link{background:none;border:0;color:var(--blau);font-weight:700;text-decoration:underline;cursor:pointer;padding:6px}
+</style>
+</head>
+<body>
+<div class="vorschau-hinweis" id="vorschau" hidden>Vorschau, es wird nichts gespeichert</div>
+
+<main class="karte">
+  <div class="kopf">
+    <small>Johann-Christian-Senckenberg-Schule</small>
+    <h1>Schön, dass Sie da sind!</h1>
+    <p>Drei kurze Fragen, ganz ohne Namen. Ihr Wohnort erscheint danach als Pin auf unserer Karte im Foyer.</p>
+  </div>
+
+  <form id="umfrage" novalidate>
+    <fieldset>
+      <legend>Wo wohnen Sie?<em>Ort antippen oder unten eintippen</em></legend>
+      <div class="chips" id="orte-chips"></div>
+      <input class="feld" id="ort-frei" list="ort-liste" placeholder="Anderer Ort, z. B. Weilmünster" autocomplete="off" maxlength="60">
+      <datalist id="ort-liste"></datalist>
+    </fieldset>
+
+    <fieldset>
+      <legend>Wie sind Sie auf uns aufmerksam geworden?<em>Mehrere Antworten möglich</em></legend>
+      <div class="chips" id="quelle-chips"></div>
+      <input class="feld" id="quelle-frei" placeholder="Sonstiges" maxlength="200">
+    </fieldset>
+
+    <fieldset>
+      <legend>Was interessiert Sie heute am meisten?<em>Mehrere Antworten möglich</em></legend>
+      <div class="chips" id="interesse-chips"></div>
+      <input class="feld" id="interesse-frei" placeholder="Sonstiges" maxlength="200">
+    </fieldset>
+
+    <div class="versteckt" aria-hidden="true"><label for="website">Website</label><input id="website" tabindex="-1" autocomplete="off"></div>
+
+    <p class="fehler" id="fehler" role="alert" hidden></p>
+    <button class="senden" id="senden" type="submit">Absenden</button>
+    <p class="klein">Wir speichern nur Ort und Antworten, keine persönlichen Daten.</p>
+  </form>
+
+  <div class="danke" id="danke" hidden>
+    <div class="pin" aria-hidden="true"></div>
+    <b>Vielen Dank!</b>
+    <p id="danke-text"></p>
+    <button class="link" type="button" id="nochmal">Weitere Antwort eingeben</button>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  const C = window.TDOT;
+  const demo = !C.WORKER_URL;
+  document.getElementById("vorschau").hidden = !demo;
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function chips(id, liste, typ, name) {
+    document.getElementById(id).innerHTML = liste.map((t, i) =>
+      `<label class="chip"><input type="${typ}" name="${name}" id="${name}-${i}" value="${esc(t)}"><span>${esc(t)}</span></label>`).join("");
+  }
+  chips("orte-chips", C.CHIP_ORTE, "radio", "ort");
+  chips("quelle-chips", C.QUELLEN, "checkbox", "quelle");
+  chips("interesse-chips", C.INTERESSEN, "checkbox", "interesse");
+  document.getElementById("ort-liste").innerHTML =
+    Object.keys(C.ORTE).sort((a, b) => a.localeCompare(b, "de")).map(o => `<option value="${esc(o)}">`).join("");
+
+  const form = document.getElementById("umfrage");
+  const frei = document.getElementById("ort-frei");
+  const fehler = document.getElementById("fehler");
+  const knopf = document.getElementById("senden");
+
+  frei.addEventListener("input", () => { if (frei.value) form.querySelectorAll('input[name="ort"]').forEach(r => r.checked = false); });
+  form.querySelectorAll('input[name="ort"]').forEach(r => r.addEventListener("change", () => frei.value = ""));
+
+  const zeigeFehler = t => { fehler.textContent = t; fehler.hidden = !t; };
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const gewaehlt = form.querySelector('input[name="ort"]:checked');
+    const ort = gewaehlt ? gewaehlt.value : frei.value.trim();
+    if (ort.length < 2) { zeigeFehler("Bitte wählen Sie einen Wohnort aus oder tippen Sie ihn ein."); frei.focus(); return; }
+    zeigeFehler("");
+
+    const eintrag = {
+      ort,
+      quelle: [...form.querySelectorAll('input[name="quelle"]:checked')].map(i => i.value),
+      quelleFrei: document.getElementById("quelle-frei").value.trim(),
+      interesse: [...form.querySelectorAll('input[name="interesse"]:checked')].map(i => i.value),
+      interesseFrei: document.getElementById("interesse-frei").value.trim(),
+      website: document.getElementById("website").value
+    };
+
+    knopf.disabled = true; knopf.textContent = "Wird gesendet …";
+    let ergebnis = { ort, gefunden: true };
+    try {
+      if (!demo) {
+        const r = await fetch(C.WORKER_URL.replace(/\/$/, "") + "/eintrag", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(eintrag)
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.fehler || "Senden fehlgeschlagen");
+        ergebnis = j;
+      }
+      document.getElementById("danke-text").textContent = ergebnis.gefunden
+        ? `${ergebnis.ort} ist jetzt auf der Karte im Foyer zu sehen.`
+        : `Ihre Antwort ist gespeichert. ${ergebnis.ort} konnten wir auf der Karte leider nicht finden.`;
+      form.hidden = true;
+      document.getElementById("danke").hidden = false;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      zeigeFehler(`${err.message}. Bitte prüfen Sie die Internetverbindung und versuchen Sie es noch einmal.`);
+    } finally {
+      knopf.disabled = false; knopf.textContent = "Absenden";
+    }
+  });
+
+  document.getElementById("nochmal").addEventListener("click", () => {
+    form.reset(); form.hidden = false; document.getElementById("danke").hidden = true;
+  });
+})();
+</script>
+</body>
+</html>

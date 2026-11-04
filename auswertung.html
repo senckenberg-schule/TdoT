@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>TdoT Auswertung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="stil.css">
+<style>
+body{padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+.rahmen{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-family:var(--display);font-size:clamp(26px,4vw,36px);margin:0;color:var(--blau-tief)}
+.zeile{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.feld{padding:10px 14px;border-radius:12px;border:1.5px solid var(--linie);background:var(--weiss);min-width:0;flex:1 1 220px;max-width:320px}
+.knopf{background:var(--blau);color:var(--weiss);border:0;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer}
+.knopf.zwei{background:var(--weiss);color:var(--blau);border:1.5px solid var(--blau)}
+.hinweis{color:var(--leise);margin:0;max-width:65ch}
+.fehler{color:var(--rot);font-weight:600;margin:0}
+.kennzahl{font-family:var(--display);font-size:20px;color:var(--blau-tief)}
+.kennzahl b{font-size:40px;color:var(--blau);font-variant-numeric:tabular-nums;margin-right:6px}
+.raster{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:20px}
+.block{background:var(--weiss);border:1px solid var(--linie);border-radius:20px;padding:20px;min-width:0}
+.block h2{margin:0 0 14px;font-family:var(--display);font-size:18px}
+.reihe{display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:4px 10px;align-items:center;margin-bottom:10px;font-size:14px}
+.reihe .spur{grid-column:1/-1;height:8px;background:var(--grund);border-radius:4px;overflow:hidden}
+.reihe .spur i{display:block;height:100%;border-radius:4px;background:var(--blau)}
+.reihe.rot .spur i{background:var(--rot)}
+.reihe b{text-align:right;font-variant-numeric:tabular-nums}
+.frei{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto}
+.frei li{background:var(--grund);border-radius:12px;padding:8px 12px;font-size:14px}
+.frei li small{display:block;color:var(--leise);font-size:12px}
+</style>
+</head>
+<body>
+<div class="vorschau-hinweis" id="vorschau" hidden>Vorschau mit Beispieldaten</div>
+<main class="rahmen">
+  <h1>Auswertung Tag der offenen Tür</h1>
+  <p class="hinweis">Die Rohdaten liegen außerdem in IServ im Ordner TdoT als <b>antworten.csv</b> (öffnet sich in Excel) und <b>daten.json</b>.</p>
+
+  <form class="zeile" id="anmelden">
+    <label for="schluessel" class="hinweis">Auswertungs-Schlüssel</label>
+    <input class="feld" id="schluessel" type="password" autocomplete="current-password">
+    <button class="knopf" type="submit">Anzeigen</button>
+    <button class="knopf zwei" type="button" id="csv" hidden>Als Excel-Tabelle (CSV) laden</button>
+  </form>
+  <p class="fehler" id="fehler" hidden></p>
+
+  <div id="inhalt" hidden>
+    <p class="kennzahl"><b id="gesamt">0</b>Antworten</p>
+    <div class="raster">
+      <div class="block"><h2>Woher?</h2><div id="w-ort"></div></div>
+      <div class="block"><h2>Wie aufmerksam geworden?</h2><div id="w-quelle"></div></div>
+      <div class="block"><h2>Was interessiert am meisten?</h2><div id="w-interesse"></div></div>
+      <div class="block"><h2>Freitext-Antworten</h2><ul class="frei" id="w-frei"></ul></div>
+    </div>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  const C = window.TDOT;
+  const demo = !C.WORKER_URL;
+  document.getElementById("vorschau").hidden = !demo;
+  const basis = (C.WORKER_URL || "").replace(/\/$/, "");
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const feld = document.getElementById("schluessel");
+  try { feld.value = sessionStorage.getItem("tdot-key") || ""; } catch (e) {}
+
+  function balken(id, zaehlung, vorgabe, klasse) {
+    const z = {}; (vorgabe || []).forEach(t => z[t] = 0);
+    Object.entries(zaehlung).forEach(([k, v]) => z[k] = v);
+    const liste = Object.entries(z).sort((a, b) => b[1] - a[1]);
+    const max = Math.max(1, ...liste.map(x => x[1]));
+    document.getElementById(id).innerHTML = liste.map(([t, n]) =>
+      `<div class="reihe ${klasse || ""}"><span>${esc(t)}</span><b>${n}</b><span class="spur"><i style="width:${n / max * 100}%"></i></span></div>`).join("");
+  }
+
+  function zeige(eintraege) {
+    const zaehle = f => { const z = {}; eintraege.forEach(e => [].concat(f(e)).forEach(x => { if (x) z[x] = (z[x] || 0) + 1; })); return z; };
+    document.getElementById("gesamt").textContent = eintraege.length;
+    balken("w-ort", zaehle(e => e.ort));
+    balken("w-quelle", zaehle(e => e.quelle), C.QUELLEN);
+    balken("w-interesse", zaehle(e => e.interesse), C.INTERESSEN, "rot");
+    const frei = [];
+    eintraege.forEach(e => {
+      if (e.quelleFrei) frei.push(["Aufmerksam geworden", e.quelleFrei, e.ort]);
+      if (e.interesseFrei) frei.push(["Interesse", e.interesseFrei, e.ort]);
+    });
+    document.getElementById("w-frei").innerHTML = frei.length
+      ? frei.map(([a, t, o]) => `<li><small>${esc(a)} · ${esc(o)}</small>${esc(t)}</li>`).join("")
+      : "<li>Keine Freitext-Antworten</li>";
+    document.getElementById("inhalt").hidden = false;
+    document.getElementById("csv").hidden = demo;
+  }
+
+  const fehler = t => { const f = document.getElementById("fehler"); f.textContent = t; f.hidden = !t; };
+
+  document.getElementById("anmelden").addEventListener("submit", async e => {
+    e.preventDefault(); fehler("");
+    if (demo) {
+      const bsp = [["Runkel", ["Grundschule"], ["Schulform IGS", "Ganztagsangebote"]], ["Limburg", ["Homepage"], ["iPad-Konzept"]],
+        ["Villmar", ["Freunde oder Bekannte", "Grundschule"], ["Neue Lernkultur"]], ["Runkel", ["Infoabend"], ["Übergang von der Grundschule"]]];
+      zeige(bsp.map(([ort, quelle, interesse]) => ({ ort, quelle, interesse, quelleFrei: "", interesseFrei: ort === "Limburg" ? "Bläserklasse" : "" })));
+      return;
+    }
+    try {
+      const r = await fetch(basis + "/export", { headers: { "X-Admin-Key": feld.value } });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.fehler || r.status);
+      try { sessionStorage.setItem("tdot-key", feld.value); } catch (e) {}
+      zeige(j.eintraege);
+    } catch (err) { fehler("Laden nicht möglich: " + err.message); }
+  });
+
+  document.getElementById("csv").addEventListener("click", async () => {
+    try {
+      const r = await fetch(basis + "/export?format=csv", { headers: { "X-Admin-Key": feld.value } });
+      if (!r.ok) throw new Error(r.status);
+      const url = URL.createObjectURL(await r.blob());
+      const a = Object.assign(document.createElement("a"), { href: url, download: "TdoT-Antworten.csv" });
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (err) { fehler("Download nicht möglich: " + err.message); }
+  });
+})();
+</script>
+</body>
+</html>

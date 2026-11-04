@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JCS Herkunftskarte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="stil.css">
+<style>
+html,body{height:100%;overflow:hidden}
+#map{position:absolute;inset:0;background:var(--grund)}
+.panel{position:absolute;z-index:5}
+.titel{top:max(24px,env(safe-area-inset-top,0px));left:max(24px,env(safe-area-inset-left,0px));padding:18px 24px;max-width:min(520px,calc(100% - 48px))}
+.titel small{font-size:clamp(11px,.9vw,14px);letter-spacing:.12em;text-transform:uppercase;color:var(--rot);font-weight:700;display:flex;align-items:center;gap:8px}
+.titel small i{width:9px;height:9px;border-radius:50%;background:var(--rot);animation:blink 2s infinite}
+@keyframes blink{50%{opacity:.25}}
+.titel h1{font-family:var(--display);font-size:clamp(24px,3.2vw,48px);line-height:1.02;margin:6px 0 0;color:var(--blau-tief);text-wrap:balance}
+.zaehler{top:max(24px,env(safe-area-inset-top,0px));right:max(24px,env(safe-area-inset-right,0px));padding:16px 24px;text-align:right}
+.zaehler b{display:block;font-family:var(--display);font-size:clamp(36px,4.6vw,72px);line-height:1;color:var(--blau);font-variant-numeric:tabular-nums}
+.zaehler span{font-size:clamp(12px,1vw,16px);color:var(--leise);font-weight:600}
+.rangliste{right:max(24px,env(safe-area-inset-right,0px));bottom:56px;width:clamp(240px,20vw,320px);padding:18px 20px}
+.rangliste h2,.qr h2{margin:0 0 12px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--leise)}
+.rangliste ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+.rangliste li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;font-weight:600;font-size:clamp(14px,1.1vw,17px)}
+.rangliste li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rangliste li b{font-variant-numeric:tabular-nums;color:var(--blau)}
+.rangliste .balken{grid-column:1/-1;height:5px;border-radius:3px;background:var(--blau-hell);overflow:hidden}
+.rangliste .balken i{display:block;height:100%;background:var(--blau);border-radius:3px;transition:width .8s}
+.rangliste .leer{color:var(--leise);font-weight:500;font-size:14px}
+.qr{left:max(24px,env(safe-area-inset-left,0px));bottom:max(24px,env(safe-area-inset-bottom,0px));padding:16px;display:flex;gap:16px;align-items:center}
+.qr #qrcode{background:var(--weiss);padding:10px;border-radius:14px;line-height:0}
+.qr #qrcode img,.qr #qrcode canvas{width:clamp(96px,9vw,150px)!important;height:auto!important}
+.qr p{margin:0;font-family:var(--display);font-weight:800;font-size:clamp(18px,1.7vw,26px);line-height:1.1;color:var(--blau-tief);max-width:11ch}
+.ticker{left:50%;transform:translateX(-50%);bottom:max(24px,env(safe-area-inset-bottom,0px));padding:12px 20px;font-weight:600;font-size:clamp(14px,1.1vw,18px);display:flex;gap:10px;align-items:center;white-space:nowrap;max-width:40vw;overflow:hidden}
+.ticker i{flex:none;width:10px;height:10px;border-radius:50%;background:var(--rot);box-shadow:0 0 0 5px rgba(211,37,58,.2)}
+.ticker span{overflow:hidden;text-overflow:ellipsis}
+.status{color:var(--rot)}
+.vollbild{right:max(24px,env(safe-area-inset-right,0px));top:calc(max(24px,env(safe-area-inset-top,0px)) + clamp(90px,8vw,130px));padding:8px 12px;font-weight:600;font-size:13px;cursor:pointer;color:var(--blau-tief)}
+
+/* Pins */
+.pin{display:flex;align-items:center;gap:8px;pointer-events:none}
+.pin .kreis{position:relative;display:grid;place-items:center;border-radius:50%;color:var(--weiss);font-family:var(--display);font-weight:800;
+  background:radial-gradient(circle at 35% 30%,#4f7fc9,var(--blau) 70%);border:3px solid var(--weiss);
+  box-shadow:0 10px 18px -6px rgba(15,45,92,.55);transition:width .5s,height .5s,font-size .5s;font-variant-numeric:tabular-nums}
+.pin .name{font-weight:700;color:var(--blau-tief);font-size:clamp(14px,1.15vw,18px);text-shadow:0 0 4px #fff,0 0 8px #fff,0 0 12px #fff;white-space:nowrap}
+.pin.neu .kreis{background:radial-gradient(circle at 35% 30%,#f0606f,var(--rot) 70%);animation:plopp .8s cubic-bezier(.2,1.5,.4,1)}
+.pin.neu .kreis::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:3px solid var(--rot);animation:welle 1.6s ease-out 4}
+@keyframes plopp{0%{transform:translateY(-70px) scale(.4);opacity:0}100%{transform:none;opacity:1}}
+@keyframes welle{to{transform:scale(3.2);opacity:0}}
+.schule{width:22px;height:22px;background:var(--weiss);border:5px solid var(--rot);border-radius:6px;transform:rotate(45deg);box-shadow:0 0 0 10px rgba(211,37,58,.15)}
+.ring-label{font-size:13px;font-weight:700;color:#6f86ad;letter-spacing:.05em;text-shadow:0 0 4px #fff,0 0 8px #fff}
+
+.maplibregl-ctrl-attrib{font-size:11px}
+@media (max-width:820px){.rangliste,.ticker,.vollbild{display:none}.qr p{display:none}
+  .zaehler{top:auto;bottom:max(24px,env(safe-area-inset-bottom,0px))}}
+</style>
+</head>
+<body>
+<div class="vorschau-hinweis" id="vorschau" hidden>Vorschau mit Beispieldaten</div>
+<div id="map" role="img" aria-label="Karte der Region mit Pins der Herkunftsorte"></div>
+
+<div class="panel glas titel"><small><i></i>Live · Tag der offenen Tür</small><h1>Woher kommen unsere Gäste?</h1></div>
+<div class="panel glas zaehler"><b id="gesamt">0</b><span>Familien bisher</span></div>
+<button class="panel glas vollbild" id="vollbild" type="button">Vollbild</button>
+<div class="panel glas rangliste"><h2>Die meisten Gäste aus</h2><ol id="top"><li class="leer">Noch keine Einträge</li></ol></div>
+<div class="panel glas qr"><div id="qrcode"></div><p>Scannen und mitmachen</p></div>
+<div class="panel glas ticker"><i></i><span id="ticker">Warte auf die ersten Einträge …</span></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  const C = window.TDOT;
+  const demo = !C.WORKER_URL;
+  const ruhig = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById("vorschau").hidden = !demo;
+
+  // ── Karte ──────────────────────────────────────────────
+  const map = new maplibregl.Map({
+    container: "map",
+    style: "https://tiles.openfreemap.org/styles/positron",
+    center: [C.SCHULE.lon, C.SCHULE.lat + 0.02],
+    zoom: 10.15, pitch: 52, bearing: -14,
+    interactive: true, attributionControl: { compact: true }
+  });
+
+  // Farben des Grundstils an die Schulfarben anpassen
+  function einfaerben() {
+    const setze = (id, prop, wert) => { try { map.setPaintProperty(id, prop, wert); } catch (e) {} };
+    for (const l of map.getStyle().layers) {
+      const id = l.id;
+      if (l.type === "background") setze(id, "background-color", "#eef3fa");
+      else if (l.type === "fill") {
+        if (/water/.test(id)) setze(id, "fill-color", "#bcd2ef");
+        else if (/building/.test(id)) setze(id, "fill-color", "#dbe5f3");
+        else if (/wood|forest|park|grass|landcover/.test(id)) setze(id, "fill-color", "#e2ecf7");
+        else setze(id, "fill-color", "#e8eff9");
+      } else if (l.type === "line") {
+        if (/water|river/.test(id)) { setze(id, "line-color", "#8fb0de"); }
+        else if (/boundary|admin/.test(id)) setze(id, "line-color", "#a9bddb");
+        else if (/rail/.test(id)) setze(id, "line-color", "#cdd9ea");
+        else setze(id, "line-color", "#ffffff");
+      } else if (l.type === "symbol") {
+        setze(id, "text-color", /water/.test(id) ? "#5f86bd" : "#4a6890");
+        setze(id, "text-halo-color", "#f3f7fd");
+      }
+    }
+  }
+
+  // Entfernungsringe um die Schule
+  function ringe() {
+    const km = [5, 10, 15, 20];
+    const kreis = (r) => {
+      const pts = [];
+      for (let i = 0; i <= 96; i++) {
+        const a = i / 96 * 2 * Math.PI;
+        pts.push([C.SCHULE.lon + r / (111.32 * Math.cos(C.SCHULE.lat * Math.PI / 180)) * Math.sin(a), C.SCHULE.lat + r / 110.574 * Math.cos(a)]);
+      }
+      return pts;
+    };
+    map.addSource("ringe", { type: "geojson", data: { type: "FeatureCollection",
+      features: km.map(r => ({ type: "Feature", properties: { km: r }, geometry: { type: "LineString", coordinates: kreis(r) } })) } });
+    map.addLayer({ id: "ringe", type: "line", source: "ringe",
+      paint: { "line-color": "#6f8fc4", "line-width": 1.6, "line-dasharray": [1, 3], "line-opacity": .8 } });
+    km.forEach(r => {
+      const el = document.createElement("div"); el.className = "ring-label"; el.textContent = r + " km";
+      new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat([C.SCHULE.lon, C.SCHULE.lat + r / 110.574]).addTo(map);
+    });
+    const s = document.createElement("div"); s.className = "schule"; s.title = C.SCHULE.name;
+    new maplibregl.Marker({ element: s }).setLngLat([C.SCHULE.lon, C.SCHULE.lat]).addTo(map);
+  }
+
+  // Langsames Schwenken für den großen Bildschirm
+  function schwenken() {
+    if (ruhig) return;
+    let richtung = 1;
+    const los = () => { richtung *= -1; map.easeTo({ bearing: -14 + richtung * 12, duration: 40000, easing: t => t }); };
+    map.on("moveend", e => { if (!e.originalEvent) setTimeout(los, 500); });
+    los();
+  }
+
+  // ── Pins ───────────────────────────────────────────────
+  const marker = {};       // ort → {m, el, n}
+  let ersterLauf = true;
+
+  function groesse(n) { return Math.round(28 + Math.sqrt(n) * 11); }
+
+  function zeichne(daten) {
+    document.getElementById("gesamt").textContent = daten.gesamt;
+    for (const o of daten.orte) {
+      if (o.lat == null) continue;
+      let p = marker[o.ort];
+      if (!p) {
+        const el = document.createElement("div"); el.className = "pin";
+        el.innerHTML = '<div class="kreis"></div><div class="name"></div>';
+        el.querySelector(".name").textContent = o.ort;
+        const m = new maplibregl.Marker({ element: el, anchor: "left", offset: [-groesse(1) / 2, 0] }).setLngLat([o.lon, o.lat]).addTo(map);
+        p = marker[o.ort] = { m, el, n: 0 };
+      }
+      if (o.n !== p.n) {
+        const k = p.el.querySelector(".kreis"), g = groesse(o.n);
+        k.textContent = o.n; k.style.width = k.style.height = g + "px"; k.style.fontSize = Math.max(14, g * .42) + "px";
+        p.m.setOffset([-g / 2, 0]);
+        if (!ersterLauf && o.n > p.n) {
+          p.el.classList.remove("neu"); void p.el.offsetWidth; p.el.classList.add("neu");
+          clearTimeout(p.t); p.t = setTimeout(() => p.el.classList.remove("neu"), 8000);
+        }
+        p.n = o.n;
+      }
+    }
+    const top = [...daten.orte].sort((a, b) => b.n - a.n).slice(0, 6);
+    const max = top[0] ? top[0].n : 1;
+    const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    document.getElementById("top").innerHTML = top.length
+      ? top.map(o => `<li><span>${esc(o.ort)}</span><b>${o.n}</b><span class="balken"><i style="width:${o.n / max * 100}%"></i></span></li>`).join("")
+      : '<li class="leer">Noch keine Einträge</li>';
+    if (daten.letzte && daten.letzte[0]) {
+      const l = daten.letzte[0];
+      const uhr = new Date(l.zeit).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+      document.getElementById("ticker").textContent = `Zuletzt: eine Familie aus ${l.ort}, ${uhr} Uhr`;
+    }
+    ersterLauf = false;
+  }
+
+  // ── Daten holen ────────────────────────────────────────
+  async function holen() {
+    try {
+      const r = await fetch(C.WORKER_URL.replace(/\/$/, "") + "/karte", { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      zeichne(await r.json());
+    } catch (e) {
+      document.getElementById("ticker").innerHTML = '<span class="status">Keine Verbindung, neuer Versuch läuft …</span>';
+    }
+  }
+
+  // Vorschau-Modus: Beispieldaten, alle paar Sekunden kommt ein Eintrag hinzu
+  const demoDaten = { gesamt: 0, orte: [], letzte: [] };
+  function demoEintrag(ort) {
+    let o = demoDaten.orte.find(x => x.ort === ort);
+    if (!o) { const k = C.ORTE[ort]; o = { ort, lon: k[0], lat: k[1], n: 0 }; demoDaten.orte.push(o); }
+    o.n++; demoDaten.gesamt++;
+    demoDaten.letzte = [{ ort, zeit: new Date().toISOString() }];
+  }
+
+  // Falls der Kartendienst nicht erreichbar ist: schlichter Hintergrund, Pins laufen trotzdem
+  let geladen = false;
+  setTimeout(() => {
+    if (!geladen) map.setStyle({ version: 8, sources: {}, layers: [{ id: "grund", type: "background", paint: { "background-color": "#eef3fa" } }] });
+  }, 10000);
+
+  map.on("load", () => {
+    geladen = true;
+    einfaerben(); ringe(); schwenken();
+    if (demo) {
+      Object.entries({ Runkel: 14, Limburg: 9, Villmar: 8, Beselich: 6, Weilburg: 5, Brechen: 4, Elz: 3, Hadamar: 2, Weinbach: 2, Merenberg: 1, Selters: 1 })
+        .forEach(([o, n]) => { for (let i = 0; i < n; i++) demoEintrag(o); });
+      zeichne(demoDaten);
+      const folge = ["Villmar", "Runkel", "Limburg", "Beselich", "Weilburg", "Brechen", "Elz", "Weinbach", "Hünfelden", "Merenberg"];
+      let i = 0;
+      setInterval(() => { demoEintrag(folge[i++ % folge.length]); zeichne(demoDaten); }, 6000);
+    } else {
+      holen();
+      setInterval(holen, (C.AKTUALISIERUNG_SEKUNDEN || 8) * 1000);
+    }
+  });
+
+  // ── QR-Code zum Formular ───────────────────────────────
+  const ziel = new URL("./", location.href).href;
+  try { new QRCode(document.getElementById("qrcode"), { text: ziel, width: 300, height: 300, colorDark: "#0f2d5c", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
+
+  // ── Vollbild und Bildschirm wach halten ────────────────
+  document.getElementById("vollbild").addEventListener("click", () => {
+    (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+  });
+  async function wach() { try { await navigator.wakeLock.request("screen"); } catch (e) {} }
+  wach(); document.addEventListener("visibilitychange", () => { if (!document.hidden) wach(); });
+})();
+</script>
+</body>
+</html>

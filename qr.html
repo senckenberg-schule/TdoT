@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TdoT QR-Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Figtree:wght@500;600&display=swap">
+<link rel="stylesheet" href="stil.css">
+<style>
+@page{size:A4;margin:15mm}
+body{background:var(--weiss);min-height:100vh;display:grid;place-items:center;padding:24px 16px}
+.plakat{text-align:center;display:flex;flex-direction:column;align-items:center;gap:18px;max-width:640px}
+.streifen{display:flex;gap:10px}.streifen i{width:60px;height:10px;border-radius:5px;background:var(--blau)}.streifen i+i{background:var(--rot)}
+h1{font-family:var(--display);font-size:clamp(34px,7vw,64px);line-height:1;margin:0;color:var(--blau-tief);text-wrap:balance}
+p{margin:0;font-size:clamp(16px,2.6vw,22px);color:var(--leise);max-width:30ch}
+#qrcode{padding:18px;border:3px solid var(--blau);border-radius:28px;line-height:0}
+#qrcode img,#qrcode canvas{width:min(70vw,360px)!important;height:auto!important}
+.url{font-size:13px;color:var(--leise);word-break:break-all}
+.drucken{background:var(--blau);color:var(--weiss);border:0;border-radius:12px;padding:10px 18px;font-weight:600;cursor:pointer}
+@media print{.drucken{display:none}}
+</style>
+</head>
+<body>
+<div class="plakat">
+  <div class="streifen"><i></i><i></i></div>
+  <h1>Woher kommen Sie?</h1>
+  <p>Scannen Sie den Code und setzen Sie Ihren Pin auf unsere Karte im Foyer.</p>
+  <div id="qrcode"></div>
+  <span class="url" id="url"></span>
+  <button class="drucken" type="button" onclick="window.print()">Drucken</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  const ziel = new URL("./", location.href).href;
+  document.getElementById("url").textContent = ziel;
+  new QRCode(document.getElementById("qrcode"), { text: ziel, width: 600, height: 600, colorDark: "#0f2d5c", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+</script>
+</body>
+</html>
