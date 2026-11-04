@@ -6,7 +6,7 @@ window.TDOT = {
 
   // Adresse des Cloudflare Workers (siehe README, Schritt 2).
   // Solange hier nichts steht, laufen alle Seiten im Vorschau-Modus mit Beispieldaten.
-  WORKER_URL: "",
+  WORKER_URL: "https://tdot.stbauer81.workers.dev",
 
   // Markierung der Schule auf der Karte.
   // Aktuell: Ortsmitte Runkel laut Wikipedia. Für den genauen Schulstandort
