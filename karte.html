@@ -104,10 +104,36 @@ html,body{height:100%;overflow:hidden}
         else if (/rail/.test(id)) setze(id, "line-color", "#cdd9ea");
         else setze(id, "line-color", "#ffffff");
       } else if (l.type === "symbol") {
-        setze(id, "text-color", /water/.test(id) ? "#5f86bd" : "#4a6890");
+        setze(id, "text-color", /water/.test(id) ? "#5f86bd" : "#8a9cb8");
         setze(id, "text-halo-color", "#f3f7fd");
       }
     }
+    // Kleine Ortsnamen ausblenden, nur Städte bleiben beschriftet
+    ["label_village", "label_other", "highway-name-major", "highway-shield-non-us"].forEach(id => {
+      try { map.setLayoutProperty(id, "visibility", "none"); } catch (e) {}
+    });
+  }
+
+  // Die Lahn hervorheben: Verlauf direkt aus den OpenStreetMap-Daten der Grundkarte (Name "Lahn")
+  function lahn() {
+    const nurLahn = ["==", ["get", "name"], "Lahn"];
+    try {
+      map.addLayer({ id: "lahn-schein", type: "line", source: "openmaptiles", "source-layer": "waterway", filter: nurLahn,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#9fbde8", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 6, 12, 14], "line-opacity": .55 } }, "label_town");
+      map.addLayer({ id: "lahn", type: "line", source: "openmaptiles", "source-layer": "waterway", filter: nurLahn,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#3f74c2", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2, 12, 5] } }, "label_town");
+      const schrift = map.getLayoutProperty("waterway_line_label", "text-font");
+      map.addLayer({ id: "lahn-name", type: "symbol", source: "openmaptiles", "source-layer": "waterway", filter: nurLahn,
+        layout: { "symbol-placement": "line", "text-field": "Lahn", "text-font": schrift, "text-size": 17, "text-letter-spacing": .15, "symbol-spacing": 420 },
+        paint: { "text-color": "#2c5aa0", "text-halo-color": "#f3f7fd", "text-halo-width": 2 } });
+      // Kontrolle in der Browser-Konsole: Wurde die Lahn in den Kartendaten gefunden?
+      map.once("idle", () => {
+        const n = map.querySourceFeatures("openmaptiles", { sourceLayer: "waterway", filter: nurLahn }).length;
+        console.log(n ? `Lahn gefunden (${n} Abschnitte)` : "Lahn nicht in den Kartendaten gefunden");
+      });
+    } catch (e) {}
   }
 
   // Entfernungsringe um die Schule
@@ -213,7 +239,7 @@ html,body{height:100%;overflow:hidden}
 
   map.on("load", () => {
     geladen = true;
-    einfaerben(); ringe(); schwenken();
+    einfaerben(); lahn(); ringe(); schwenken();
     if (demo) {
       Object.entries({ Runkel: 14, Limburg: 9, Villmar: 8, Beselich: 6, Weilburg: 5, Brechen: 4, Elz: 3, Hadamar: 2, Weinbach: 2, Merenberg: 1, Selters: 1 })
         .forEach(([o, n]) => { for (let i = 0; i < n; i++) demoEintrag(o); });
