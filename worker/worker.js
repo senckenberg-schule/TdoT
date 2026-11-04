@@ -4,10 +4,15 @@
 //  Aufgabe: nimmt die Antworten aus dem Formular entgegen und speichert sie
 //  in IServ (Nextcloud/WebDAV). Die Zugangsdaten liegen nur hier als Secrets.
 //
+//  Speicherprinzip (hält auch viele gleichzeitige Antworten aus):
+//    TdoT/eintraege/<zeit>_<id>.json   jede Antwort als eigene Datei (maßgeblich)
+//    TdoT/daten.json                   Übersicht, wird laufend aus den Einzeldateien ergänzt
+//    TdoT/antworten.csv                Tabelle für Excel, wird mit der Übersicht aktualisiert
+//
 //  Variablen (Cloudflare → Worker → Einstellungen → Variablen und Secrets):
 //    NC_BASE        https://cloudfiles.senckenberg-runkel.de/remote.php/dav/files/<ID>
-//    NC_USER        IServ-Benutzername für WebDAV            (Secret)
-//    NC_PASS        Passwort bzw. App-Passwort                (Secret)
+//    NC_USER        Benutzername für WebDAV (Secret)
+//    NC_PASS        App-Passwort (Secret)
 //    ADMIN_KEY      selbst gewählter Schlüssel für die Auswertung (Secret)
 //    ALLOWED_ORIGIN https://senckenberg-schule.github.io
 //    FOLDER         TdoT   (optional, Ordner in IServ)
@@ -31,8 +36,8 @@ const ORTE = {
   "hünfelden": ["Hünfelden", 8.150, 50.333]
 };
 
-const MAX_EINTRAEGE = 5000;
 const UA = "JCS-TdoT-Herkunftskarte/1.0 (Schulprojekt Johann-Christian-Senckenberg-Schule Runkel)";
+const NACHLADEN_MAX = 40;   // so viele neue Einzeldateien pro Abruf übernehmen (Cloudflare erlaubt 50 Anfragen)
 
 export default {
   async fetch(request, env, ctx) {
@@ -64,13 +69,11 @@ export default {
         if (!env.ADMIN_KEY || request.headers.get("X-Admin-Key") !== env.ADMIN_KEY) {
           return antwort({ fehler: "Schlüssel fehlt oder ist falsch" }, 401);
         }
-        const { daten } = await lesen(env);
+        const { daten, vollstaendig } = await aktuell(env, ctx);
         if (url.searchParams.get("format") === "csv") {
-          return new Response(csv(daten.eintraege), {
-            headers: { "Content-Type": "text/csv; charset=utf-8", ...cors }
-          });
+          return new Response(csv(daten.eintraege), { headers: { "Content-Type": "text/csv; charset=utf-8", ...cors } });
         }
-        return antwort({ eintraege: daten.eintraege });
+        return antwort({ eintraege: daten.eintraege, vollstaendig });
       }
       return antwort({ fehler: "Unbekannte Adresse" }, 404);
     } catch (e) {
@@ -79,57 +82,43 @@ export default {
   }
 };
 
-// ── Speichern ───────────────────────────────────────────────
+// ── Speichern: eine Datei pro Antwort, dadurch keine Konflikte ──
 
 async function speichern(request, env) {
   let roh;
   try { roh = await request.json(); } catch { throw fehler("Ungültige Daten", 400); }
-
-  // Honeypot: echte Eltern sehen dieses Feld nicht
-  if (roh.website) return { ok: true };
+  if (roh.website) return { ok: true };   // Honeypot: echte Eltern sehen dieses Feld nicht
 
   const text = (v, max) => String(v || "").replace(/\s+/g, " ").trim().slice(0, max);
   const liste = (v, max) => (Array.isArray(v) ? v : []).map(x => text(x, 80)).filter(Boolean).slice(0, max);
 
-  let ort = text(roh.ort, 60);
+  const ort = text(roh.ort, 60);
   if (ort.length < 2) throw fehler("Bitte einen Wohnort angeben", 400);
 
   const eintrag = {
     id: crypto.randomUUID(),
     zeit: new Date().toISOString(),
-    ort,
-    lon: null, lat: null,
+    ort, lon: null, lat: null,
     quelle: liste(roh.quelle, 10),
     quelleFrei: text(roh.quelleFrei, 200),
     interesse: liste(roh.interesse, 10),
     interesseFrei: text(roh.interesseFrei, 200)
   };
 
-  // Daten lesen, Ort suchen, zurückschreiben. Falls jemand gleichzeitig speichert,
-  // meldet IServ einen Konflikt (412) und wir versuchen es mit dem neuen Stand erneut.
-  for (let versuch = 0; versuch < 8; versuch++) {
-    const { daten, etag } = await lesen(env);
-    if (daten.eintraege.length >= MAX_EINTRAEGE) throw fehler("Speicher voll", 507);
+  const treffer = await geocode(ort, env);
+  if (treffer) [eintrag.ort, eintrag.lon, eintrag.lat] = treffer;
 
-    const treffer = await geocode(ort, daten.geocache);
-    if (treffer) { eintrag.ort = treffer[0]; eintrag.lon = treffer[1]; eintrag.lat = treffer[2]; }
-
-    daten.eintraege.push(eintrag);
-    const ok = await schreiben(env, "daten.json", JSON.stringify(daten), etag);
-    if (ok) {
-      // Tabelle für Excel aktualisieren (Fehler hier sind unkritisch, daten.json ist maßgeblich)
-      await schreiben(env, "antworten.csv", csv(daten.eintraege), undefined).catch(() => {});
-      return { ok: true, ort: eintrag.ort, gefunden: eintrag.lat !== null };
-    }
-    await new Promise(r => setTimeout(r, 150 + Math.random() * 400));
-  }
-  throw fehler("Gerade sehr viel los, bitte noch einmal senden", 503);
+  const name = `${eintrag.zeit.replace(/[:.]/g, "-")}_${eintrag.id.slice(0, 8)}.json`;
+  await schreiben(env, "eintraege/" + name, JSON.stringify(eintrag));
+  return { ok: true, ort: eintrag.ort, gefunden: eintrag.lat !== null };
 }
 
-async function geocode(ort, cache) {
+// Ortssuche: erst feste Liste, dann Zwischenspeicher, dann OpenStreetMap (Nominatim)
+const geoCache = new Map();
+async function geocode(ort, env) {
   const key = ort.toLowerCase();
   if (ORTE[key]) return ORTE[key];
-  if (key in cache) return cache[key];
+  if (geoCache.has(key)) return geoCache.get(key);
 
   let ergebnis = null;
   try {
@@ -145,12 +134,37 @@ async function geocode(ort, cache) {
       const [t] = await r.json();
       if (t) ergebnis = [t.name || ort, Math.round(+t.lon * 1e4) / 1e4, Math.round(+t.lat * 1e4) / 1e4];
     }
-  } catch { /* Ort bleibt ohne Position, Eintrag wird trotzdem gespeichert */ }
-  cache[key] = ergebnis;
+  } catch { /* Ort bleibt ohne Position, Antwort wird trotzdem gespeichert */ }
+  geoCache.set(key, ergebnis);
   return ergebnis;
 }
 
-// ── Karte ───────────────────────────────────────────────────
+// ── Übersicht aktuell halten ────────────────────────────────
+
+// Liest daten.json, holt neue Einzeldateien dazu und schreibt die Übersicht zurück.
+// Mehrere Bildschirme dürfen das gleichzeitig tun: Grundlage sind immer die Einzeldateien,
+// eine überschriebene Übersicht ergänzt sich beim nächsten Abruf von selbst.
+async function aktuell(env, ctx) {
+  const daten = await lesen(env);
+  const liste = await dateiliste(env);
+  const bekannt = new Set(daten.eintraege.map(e => e.datei));
+  const neu = liste.filter(n => !bekannt.has(n));
+  const jetzt = neu.slice(0, NACHLADEN_MAX);
+
+  const geladen = await Promise.all(jetzt.map(async n => {
+    const r = await fetch(pfad(env, "eintraege/" + encodeURIComponent(n)), { headers: { Authorization: auth(env) } });
+    return r.ok ? { ...(await r.json()), datei: n } : null;
+  }));
+  const dazu = geladen.filter(Boolean);
+  if (dazu.length) {
+    daten.eintraege = [...daten.eintraege, ...dazu].sort((a, b) => a.zeit.localeCompare(b.zeit));
+    ctx.waitUntil(Promise.all([
+      schreiben(env, "daten.json", JSON.stringify(daten)),
+      schreiben(env, "antworten.csv", csv(daten.eintraege))
+    ]).catch(() => {}));
+  }
+  return { daten, vollstaendig: neu.length <= NACHLADEN_MAX };
+}
 
 async function karte(env, ctx) {
   // Kurzer Zwischenspeicher, damit mehrere Bildschirme IServ nicht unnötig belasten
@@ -159,22 +173,18 @@ async function karte(env, ctx) {
   const alt = await cache.match(schluessel);
   if (alt) return alt.json();
 
-  const { daten } = await lesen(env);
+  const { daten } = await aktuell(env, ctx);
   const orte = {};
   for (const e of daten.eintraege) {
-    const k = e.ort;
-    orte[k] ??= { ort: k, lon: e.lon, lat: e.lat, n: 0, zuletzt: e.zeit };
-    orte[k].n++;
-    if (e.zeit > orte[k].zuletzt) orte[k].zuletzt = e.zeit;
+    orte[e.ort] ??= { ort: e.ort, lon: e.lon, lat: e.lat, n: 0 };
+    orte[e.ort].n++;
   }
   const ergebnis = {
     gesamt: daten.eintraege.length,
     orte: Object.values(orte),
     letzte: daten.eintraege.slice(-5).reverse().map(e => ({ ort: e.ort, zeit: e.zeit }))
   };
-  ctx.waitUntil(cache.put(schluessel, new Response(JSON.stringify(ergebnis), {
-    headers: { "Cache-Control": "max-age=4" }
-  })));
+  ctx.waitUntil(cache.put(schluessel, new Response(JSON.stringify(ergebnis), { headers: { "Cache-Control": "max-age=4" } })));
   return ergebnis;
 }
 
@@ -187,38 +197,52 @@ function auth(env) {
   const b = new TextEncoder().encode(`${env.NC_USER}:${env.NC_PASS}`);
   return "Basic " + btoa(String.fromCharCode(...b));
 }
-
-async function lesen(env) {
-  const r = await fetch(pfad(env, "daten.json"), {
-    headers: { Authorization: auth(env) }, cf: { cacheTtl: 0 }
-  });
-  if (r.status === 404) return { daten: { eintraege: [], geocache: {} }, etag: null };
+function pruefe(r) {
   if (r.status === 401) throw fehler("IServ-Anmeldung fehlgeschlagen (Benutzer oder Passwort prüfen)", 502);
-  if (!r.ok) throw fehler(`IServ antwortet mit ${r.status}`, 502);
-  const daten = await r.json();
-  daten.eintraege ??= [];
-  daten.geocache ??= {};
-  return { daten, etag: r.headers.get("ETag") };
 }
 
-// etag: null = Datei darf noch nicht existieren, undefined = ohne Prüfung überschreiben
-async function schreiben(env, datei, inhalt, etag) {
+async function lesen(env) {
+  // Zufälliger Zusatz an der Adresse, damit kein Zwischenspeicher eine alte Fassung liefert
+  const r = await fetch(pfad(env, "daten.json") + "?frisch=" + Date.now() + Math.random().toString(36).slice(2), {
+    headers: { Authorization: auth(env), "Cache-Control": "no-cache", Pragma: "no-cache" }
+  });
+  pruefe(r);
+  if (r.status === 404) return { eintraege: [] };
+  if (!r.ok) throw fehler(`IServ antwortet mit ${r.status}`, 502);
+  const daten = await r.json();
+  daten.eintraege = (daten.eintraege || []).filter(e => e.datei);
+  return daten;
+}
+
+async function dateiliste(env) {
+  const r = await fetch(pfad(env, "eintraege/"), {
+    method: "PROPFIND",
+    headers: { Authorization: auth(env), Depth: "1", "Content-Type": "application/xml" },
+    body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>'
+  });
+  pruefe(r);
+  if (r.status === 404) return [];
+  if (!r.ok) throw fehler(`IServ antwortet mit ${r.status}`, 502);
+  return [...(await r.text()).matchAll(/<(?:\w+:)?href>([^<]+\.json)<\/(?:\w+:)?href>/g)]
+    .map(m => decodeURIComponent(m[1].split("/").pop()));
+}
+
+async function schreiben(env, datei, inhalt) {
   const headers = {
     Authorization: auth(env),
     "Content-Type": datei.endsWith(".csv") ? "text/csv; charset=utf-8" : "application/json"
   };
-  if (etag === null) headers["If-None-Match"] = "*";
-  else if (etag) headers["If-Match"] = etag;
-
   let r = await fetch(pfad(env, datei), { method: "PUT", headers, body: inhalt });
   if (r.status === 404 || r.status === 409) {
     // Ordner fehlt noch: anlegen und erneut versuchen
     await fetch(pfad(env, ""), { method: "MKCOL", headers: { Authorization: auth(env) } });
+    if (datei.includes("/")) {
+      await fetch(pfad(env, datei.slice(0, datei.lastIndexOf("/") + 1)), { method: "MKCOL", headers: { Authorization: auth(env) } });
+    }
     r = await fetch(pfad(env, datei), { method: "PUT", headers, body: inhalt });
   }
-  if (r.status === 412) return false;
+  pruefe(r);
   if (!r.ok) throw fehler(`Speichern in IServ fehlgeschlagen (${r.status})`, 502);
-  return true;
 }
 
 // ── Hilfen ──────────────────────────────────────────────────
