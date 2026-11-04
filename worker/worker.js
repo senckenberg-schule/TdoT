@@ -33,7 +33,15 @@ const ORTE = {
   "dornburg": ["Dornburg", 8.024, 50.504], "löhnberg": ["Löhnberg", 8.267, 50.517],
   "weilmünster": ["Weilmünster", 8.367, 50.433], "mengerskirchen": ["Mengerskirchen", 8.156, 50.564],
   "diez": ["Diez", 8.016, 50.371], "bad camberg": ["Bad Camberg", 8.267, 50.300],
-  "hünfelden": ["Hünfelden", 8.150, 50.333]
+  "hünfelden": ["Hünfelden", 8.150, 50.333],
+  // Ortsteile von Villmar und Runkel (Wikipedia/Wikidata, abgeglichen mit OpenStreetMap)
+  "aumenau": ["Aumenau", 8.253, 50.403], "falkenbach": ["Falkenbach", 8.246, 50.436],
+  "langhecke": ["Langhecke", 8.281, 50.389], "seelbach": ["Seelbach", 8.229, 50.416],
+  "weyer": ["Weyer", 8.224, 50.368], "arfurt": ["Arfurt", 8.198, 50.407],
+  "dehrn": ["Dehrn", 8.099, 50.420], "ennerich": ["Ennerich", 8.128, 50.393],
+  "eschenau": ["Eschenau", 8.175, 50.436], "hofen": ["Hofen", 8.159, 50.426],
+  "schadeck": ["Schadeck", 8.158, 50.410], "steeden": ["Steeden", 8.126, 50.417],
+  "wirbelau": ["Wirbelau", 8.223, 50.444]
 };
 
 const UA = "JCS-TdoT-Herkunftskarte/1.0 (Schulprojekt Johann-Christian-Senckenberg-Schule Runkel)";
