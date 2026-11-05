@@ -34,9 +34,9 @@ window.TDOT = {
   // Orte, die im Formular als Knöpfe erscheinen
   CHIP_ORTE: ["Villmar", "Aumenau", "Falkenbach", "Langhecke", "Seelbach", "Weyer", "Runkel", "Limburg", "Weilburg", "Beselich", "Weinbach", "Brechen", "Elz", "Hadamar", "Merenberg"],
 
-  QUELLEN: ["Grundschule", "Freunde oder Bekannte", "Homepage", "Social Media", "Zeitung", "Infoabend"],
+  QUELLEN: ["Grundschule", "Freunde oder Bekannte", "Homepage", "Social Media", "Infoabend"],
 
-  INTERESSEN: ["Schulform IGS", "Neue Lernkultur", "Ganztagsangebote", "Förderung und individuelle Unterstützung", "Übergang von der Grundschule", "iPad-Konzept"],
+  INTERESSEN: ["Schulform IGS", "Neue Lernkultur", "Ganztagsangebote", "Förderung und individuelle Unterstützung", "iPad-Konzept"],
 
   // Wie oft die Live-Karte nach neuen Einträgen fragt (Sekunden)
   AKTUALISIERUNG_SEKUNDEN: 8
