@@ -24,15 +24,22 @@ p{margin:0;font-size:clamp(16px,2.6vw,22px);color:var(--leise);max-width:30ch}
 <body>
 <div class="plakat">
   <div class="streifen"><i></i><i></i></div>
-  <h1>Woher kommen Sie?</h1>
-  <p>Scannen Sie den Code und setzen Sie Ihren Pin auf unsere Karte im Foyer.</p>
+  <h1 id="titel">Woher kommen Sie?</h1>
+  <p id="text">Scannen Sie den Code und setzen Sie Ihren Pin auf unsere Karte im Foyer.</p>
   <div id="qrcode"></div>
   <span class="url" id="url"></span>
   <button class="drucken" type="button" onclick="window.print()">Drucken</button>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-  const ziel = new URL("./", location.href).href;
+  // qr.html zeigt das Plakat für die Herkunftskarte, qr.html?seite=rueckmeldung das für die Rückmeldung
+  const rueck = new URLSearchParams(location.search).get("seite") === "rueckmeldung";
+  const ziel = new URL(rueck ? "rueckmeldung.html" : "./", location.href).href;
+  if (rueck) {
+    document.title = "TdoT QR-Code Rückmeldung";
+    document.getElementById("titel").textContent = "Wie gut fühlen Sie sich informiert?";
+    document.getElementById("text").textContent = "Drei kurze Fragen zum Abschluss, ganz ohne Namen. Wir freuen uns auf Ihre Rückmeldung.";
+  }
   document.getElementById("url").textContent = ziel;
   new QRCode(document.getElementById("qrcode"), { text: ziel, width: 600, height: 600, colorDark: "#0f2d5c", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
 </script>

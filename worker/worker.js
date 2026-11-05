@@ -19,8 +19,10 @@
 //
 //  Endpunkte:
 //    POST /eintrag   Antwort aus dem Formular speichern
+//    POST /rueckmeldung  Rückmeldung am Ende des Tages speichern (TdoT/rueckmeldungen/)
 //    GET  /karte     nur Orte und Anzahlen für die Live-Karte (keine Freitexte)
-//    GET  /export    alle Antworten, nur mit Header X-Admin-Key (?format=csv für CSV)
+//    GET  /export    alle Antworten, nur mit Header X-Admin-Key (?format=csv für CSV,
+//                    ?art=rueckmeldung für die Rückmeldungen)
 // ─────────────────────────────────────────────────────────────
 
 const ORTE = {
@@ -70,6 +72,10 @@ export default {
         if (!erlaubt) return antwort({ fehler: "Nicht erlaubt" }, 403);
         return antwort(await speichern(request, env));
       }
+      if (url.pathname === "/rueckmeldung" && request.method === "POST") {
+        if (!erlaubt) return antwort({ fehler: "Nicht erlaubt" }, 403);
+        return antwort(await rueckmeldungSpeichern(request, env));
+      }
       if (url.pathname === "/karte" && request.method === "GET") {
         return antwort(await karte(env, ctx), 200, { "Cache-Control": "no-store" });
       }
@@ -77,9 +83,10 @@ export default {
         if (!env.ADMIN_KEY || request.headers.get("X-Admin-Key") !== env.ADMIN_KEY) {
           return antwort({ fehler: "Schlüssel fehlt oder ist falsch" }, 401);
         }
-        const { daten, vollstaendig } = await aktuell(env, ctx);
+        const art = url.searchParams.get("art") === "rueckmeldung" ? RUECKMELDUNGEN : HERKUNFT;
+        const { daten, vollstaendig } = await aktuell(env, ctx, art);
         if (url.searchParams.get("format") === "csv") {
-          return new Response(csv(daten.eintraege), { headers: { "Content-Type": "text/csv; charset=utf-8", ...cors } });
+          return new Response(art.csv(daten.eintraege), { headers: { "Content-Type": "text/csv; charset=utf-8", ...cors } });
         }
         return antwort({ eintraege: daten.eintraege, vollstaendig });
       }
@@ -116,9 +123,33 @@ async function speichern(request, env) {
   const treffer = await geocode(ort, env);
   if (treffer) [eintrag.ort, eintrag.lon, eintrag.lat] = treffer;
 
-  const name = `${eintrag.zeit.replace(/[:.]/g, "-")}_${eintrag.id.slice(0, 8)}.json`;
-  await schreiben(env, "eintraege/" + name, JSON.stringify(eintrag));
+  await schreiben(env, HERKUNFT.ordner + dateiname(eintrag), JSON.stringify(eintrag));
   return { ok: true, ort: eintrag.ort, gefunden: eintrag.lat !== null };
+}
+
+const INFORMIERT = ["Sehr gut", "Gut", "Teilweise", "Noch kaum"];
+
+async function rueckmeldungSpeichern(request, env) {
+  let roh;
+  try { roh = await request.json(); } catch { throw fehler("Ungültige Daten", 400); }
+  if (roh.website) return { ok: true };
+  const text = (v, max) => String(v || "").replace(/[ \t]+/g, " ").trim().slice(0, max);
+
+  const r = {
+    id: crypto.randomUUID(),
+    zeit: new Date().toISOString(),
+    informiert: INFORMIERT.includes(roh.informiert) ? roh.informiert : "",
+    offeneFragen: roh.offeneFragen === true,
+    fragen: roh.offeneFragen === true ? text(roh.fragen, 1000) : "",
+    rueckmeldung: text(roh.rueckmeldung, 1500)
+  };
+  if (!r.informiert) throw fehler("Bitte beantworten Sie die erste Frage", 400);
+  await schreiben(env, RUECKMELDUNGEN.ordner + dateiname(r), JSON.stringify(r));
+  return { ok: true };
+}
+
+function dateiname(e) {
+  return `${e.zeit.replace(/[:.]/g, "-")}_${e.id.slice(0, 8)}.json`;
 }
 
 // Ortssuche: erst feste Liste, dann Zwischenspeicher, dann OpenStreetMap (Nominatim)
@@ -152,23 +183,27 @@ async function geocode(ort, env) {
 // Liest daten.json, holt neue Einzeldateien dazu und schreibt die Übersicht zurück.
 // Mehrere Bildschirme dürfen das gleichzeitig tun: Grundlage sind immer die Einzeldateien,
 // eine überschriebene Übersicht ergänzt sich beim nächsten Abruf von selbst.
-async function aktuell(env, ctx) {
-  const daten = await lesen(env);
-  const liste = await dateiliste(env);
+// Zwei Speicherbereiche mit demselben Prinzip
+const HERKUNFT = { ordner: "eintraege/", uebersicht: "daten.json", tabelle: "antworten.csv", csv: e => csv(e) };
+const RUECKMELDUNGEN = { ordner: "rueckmeldungen/", uebersicht: "rueckmeldungen.json", tabelle: "rueckmeldungen.csv", csv: e => csvRueckmeldung(e) };
+
+async function aktuell(env, ctx, art = HERKUNFT) {
+  const daten = await lesen(env, art.uebersicht);
+  const liste = await dateiliste(env, art.ordner);
   const bekannt = new Set(daten.eintraege.map(e => e.datei));
   const neu = liste.filter(n => !bekannt.has(n));
   const jetzt = neu.slice(0, NACHLADEN_MAX);
 
   const geladen = await Promise.all(jetzt.map(async n => {
-    const r = await fetch(pfad(env, "eintraege/" + encodeURIComponent(n)), { headers: { Authorization: auth(env) } });
+    const r = await fetch(pfad(env, art.ordner + encodeURIComponent(n)), { headers: { Authorization: auth(env) } });
     return r.ok ? { ...(await r.json()), datei: n } : null;
   }));
   const dazu = geladen.filter(Boolean);
   if (dazu.length) {
     daten.eintraege = [...daten.eintraege, ...dazu].sort((a, b) => a.zeit.localeCompare(b.zeit));
     ctx.waitUntil(Promise.all([
-      schreiben(env, "daten.json", JSON.stringify(daten)),
-      schreiben(env, "antworten.csv", csv(daten.eintraege))
+      schreiben(env, art.uebersicht, JSON.stringify(daten)),
+      schreiben(env, art.tabelle, art.csv(daten.eintraege))
     ]).catch(() => {}));
   }
   return { daten, vollstaendig: neu.length <= NACHLADEN_MAX };
@@ -209,9 +244,9 @@ function pruefe(r) {
   if (r.status === 401) throw fehler("IServ-Anmeldung fehlgeschlagen (Benutzer oder Passwort prüfen)", 502);
 }
 
-async function lesen(env) {
+async function lesen(env, datei = "daten.json") {
   // Zufälliger Zusatz an der Adresse, damit kein Zwischenspeicher eine alte Fassung liefert
-  const r = await fetch(pfad(env, "daten.json") + "?frisch=" + Date.now() + Math.random().toString(36).slice(2), {
+  const r = await fetch(pfad(env, datei) + "?frisch=" + Date.now() + Math.random().toString(36).slice(2), {
     headers: { Authorization: auth(env), "Cache-Control": "no-cache", Pragma: "no-cache" }
   });
   pruefe(r);
@@ -222,8 +257,8 @@ async function lesen(env) {
   return daten;
 }
 
-async function dateiliste(env) {
-  const r = await fetch(pfad(env, "eintraege/"), {
+async function dateiliste(env, ordner = "eintraege/") {
+  const r = await fetch(pfad(env, ordner), {
     method: "PROPFIND",
     headers: { Authorization: auth(env), Depth: "1", "Content-Type": "application/xml" },
     body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>'
@@ -265,6 +300,19 @@ function csv(eintraege) {
     new Date(e.zeit).toLocaleString("de-DE", { timeZone: "Europe/Berlin" }),
     e.ort, e.lat ?? "", e.lon ?? "",
     e.quelle.join(" | "), e.quelleFrei, e.interesse.join(" | "), e.interesseFrei
+  ].map(zelle).join(";"));
+  return "﻿" + [kopf.join(";"), ...zeilen].join("\r\n");
+}
+
+function csvRueckmeldung(eintraege) {
+  const zelle = v => {
+    const s = String(v ?? "");
+    return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const kopf = ["Zeit", "Wie gut informiert", "Offene Fragen", "Welche Fragen", "Freie Rückmeldung"];
+  const zeilen = eintraege.map(e => [
+    new Date(e.zeit).toLocaleString("de-DE", { timeZone: "Europe/Berlin" }),
+    e.informiert, e.offeneFragen ? "Ja" : "Nein", e.fragen, e.rueckmeldung
   ].map(zelle).join(";"));
   return "﻿" + [kopf.join(";"), ...zeilen].join("\r\n");
 }

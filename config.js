@@ -38,6 +38,10 @@ window.TDOT = {
 
   INTERESSEN: ["Schulform IGS", "Neue Lernkultur", "Ganztagsangebote", "Förderung und individuelle Unterstützung", "iPad-Konzept"],
 
+  // Rückmeldung am Ende des Tages (rueckmeldung.html)
+  INFOABEND: { datum: "Dienstag, 19. Januar 2027", uhrzeit: "19:00 Uhr", ort: "Schulstandort Villmar" },
+  HOMEPAGE: "https://www.senckenberg-schule.de",   // Schul-Homepage auf der Dankeseite. Leer = kein Link
+
   // Wie oft die Live-Karte nach neuen Einträgen fragt (Sekunden)
   AKTUALISIERUNG_SEKUNDEN: 8
 };

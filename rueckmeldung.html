@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ihre Rückmeldung an die JCS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="stil.css">
+<style>
+body{min-height:100vh;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(24px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.karte{max-width:460px;margin:0 auto;background:var(--weiss);border-radius:28px;border:1px solid var(--linie);box-shadow:0 30px 60px -30px rgba(15,45,92,.35);overflow:hidden}
+.kopf{background:var(--blau);color:var(--weiss);padding:26px 22px 22px;position:relative;overflow:hidden}
+.kopf::after{content:"";position:absolute;right:-40px;top:-40px;width:140px;height:140px;border-radius:50%;border:18px solid var(--rot)}
+.kopf small{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;font-weight:600;max-width:24ch}
+.kopf h1{font-family:var(--display);font-size:28px;line-height:1.1;margin:8px 0;text-wrap:balance;max-width:14ch;position:relative;z-index:1}
+.kopf p{margin:0;font-size:14px;opacity:.92;max-width:32ch}
+form{padding:20px 22px 24px;display:flex;flex-direction:column;gap:26px}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+legend{font-family:var(--display);font-weight:700;font-size:17px;margin-bottom:10px;padding:0;text-wrap:balance}
+legend em{font-style:normal;font-family:var(--body);font-weight:500;font-size:13px;color:var(--leise);display:block;margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips.stapel{flex-direction:column}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer;width:100%;height:100%}
+.chip span{display:inline-block;padding:9px 14px;border-radius:999px;border:1.5px solid var(--linie);font-weight:600;font-size:15px;background:var(--weiss);transition:background .15s,border-color .15s,color .15s}
+.stapel .chip span{display:block;border-radius:14px}
+.chip input:checked + span{background:var(--blau);border-color:var(--blau);color:var(--weiss)}
+.chip input:focus-visible + span{outline:3px solid var(--rot);outline-offset:2px}
+.feld{width:100%;padding:12px 14px;border-radius:14px;border:1.5px solid var(--linie);background:var(--grund);font-size:16px;resize:vertical;min-height:96px;font-family:inherit}
+.feld:focus{border-color:var(--blau);outline:none;background:var(--weiss)}
+.aufklapp{display:flex;flex-direction:column;gap:8px}
+.aufklapp label{font-weight:600;font-size:15px}
+.aufklapp label em{font-style:normal;font-weight:500;color:var(--leise);font-size:13px}
+.senden{background:var(--rot);color:var(--weiss);border:0;border-radius:16px;padding:15px;font-weight:700;font-size:17px;cursor:pointer}
+.senden:hover{background:var(--rot-dunkel)}
+.senden:disabled{opacity:.6;cursor:wait}
+.klein{font-size:12px;color:var(--leise);text-align:center;margin:-12px 0 0}
+.fehler{color:var(--rot);font-size:14px;font-weight:600;margin:0}
+.versteckt{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.danke{padding:40px 24px 32px;display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center}
+.danke .haken{width:60px;height:60px;border-radius:50%;background:var(--blau);display:grid;place-items:center}
+.danke .haken::after{content:"";width:22px;height:12px;border-left:5px solid var(--weiss);border-bottom:5px solid var(--weiss);transform:translateY(-3px) rotate(-45deg)}
+.danke b{font-family:var(--display);font-size:26px;color:var(--blau-tief)}
+.danke p{margin:0;max-width:32ch;color:var(--leise)}
+.infoabend{width:100%;text-align:left;background:var(--grund);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.infoabend h2{margin:0;font-family:var(--display);font-size:18px;color:var(--blau-tief)}
+.termin{background:var(--weiss);border-left:5px solid var(--rot);border-radius:12px;padding:12px 14px;font-weight:600;line-height:1.4}
+.termin span{display:block;font-weight:500;color:var(--leise);font-size:14px}
+.infoabend a{color:var(--blau);font-weight:700;word-break:break-word}
+.infoabend small{color:var(--leise);font-size:12px}
+</style>
+</head>
+<body>
+<div class="vorschau-hinweis" id="vorschau" hidden>Vorschau, es wird nichts gespeichert</div>
+
+<main class="karte">
+  <div class="kopf">
+    <small>Johann-Christian-Senckenberg-Schule</small>
+    <h1>Danke für Ihren Besuch!</h1>
+    <p>Drei kurze Fragen, ganz ohne Namen. Ihre Rückmeldung hilft uns, noch besser zu informieren.</p>
+  </div>
+
+  <form id="umfrage" novalidate>
+    <fieldset>
+      <legend>Wie gut fühlen Sie sich jetzt über unsere Schule informiert?</legend>
+      <div class="chips" id="informiert"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Haben Sie noch Fragen, die heute nicht beantwortet werden konnten?</legend>
+      <div class="chips stapel">
+        <label class="chip"><input type="radio" name="offen" id="offen-nein" value="nein"><span>Nein, alles geklärt</span></label>
+        <label class="chip"><input type="radio" name="offen" id="offen-ja" value="ja"><span>Ja, ich habe noch Fragen</span></label>
+      </div>
+      <div class="aufklapp" id="fragen-box" hidden>
+        <label for="fragen">Was möchten Sie noch wissen? <em>(freiwillig)</em></label>
+        <textarea class="feld" id="fragen" maxlength="1000" rows="3"></textarea>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Möchten Sie uns noch etwas mit auf den Weg geben?<em>Lob, Anregungen oder Kritik, wir freuen uns über jede Rückmeldung.</em></legend>
+      <label class="versteckt" for="rueckmeldung">Ihre Rückmeldung</label>
+      <textarea class="feld" id="rueckmeldung" maxlength="1500" rows="4"></textarea>
+    </fieldset>
+
+    <div class="versteckt" aria-hidden="true"><label for="website">Website</label><input id="website" tabindex="-1" autocomplete="off"></div>
+
+    <p class="fehler" id="fehler" role="alert" hidden></p>
+    <button class="senden" id="senden" type="submit">Absenden</button>
+    <p class="klein">Ihre Rückmeldung ist anonym. Wir speichern keine persönlichen Daten.</p>
+  </form>
+
+  <div class="danke" id="danke" hidden>
+    <div class="haken" aria-hidden="true"></div>
+    <b>Vielen Dank für Ihre Rückmeldung!</b>
+    <p>Sie helfen uns, den Tag der offenen Tür weiter zu verbessern.</p>
+
+    <div class="infoabend" id="infoabend" hidden>
+      <h2>Ihre Fragen beantworten wir gerne persönlich</h2>
+      <div class="termin" id="termin"></div>
+      <p id="homepage-zeile" hidden>Alles Wichtige finden Sie auch auf unserer Homepage:<br><a id="homepage" target="_blank" rel="noopener"></a></p>
+      <small>Ihre Rückmeldung ist anonym, deshalb können wir Ihnen nicht direkt antworten.</small>
+    </div>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  const C = window.TDOT;
+  const demo = !C.WORKER_URL;
+  document.getElementById("vorschau").hidden = !demo;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const STUFEN = ["Sehr gut", "Gut", "Teilweise", "Noch kaum"];
+  document.getElementById("informiert").innerHTML = STUFEN.map((t, i) =>
+    `<label class="chip"><input type="radio" name="informiert" id="informiert-${i}" value="${esc(t)}"><span>${esc(t)}</span></label>`).join("");
+
+  // Infoabend und Homepage aus config.js
+  const I = C.INFOABEND || {};
+  document.getElementById("termin").innerHTML =
+    `Infoabend am ${esc(I.datum || "")}<span>${esc(I.uhrzeit || "")}${I.ort ? ", " + esc(I.ort) : ""}</span>`;
+  if (C.HOMEPAGE) {
+    const a = document.getElementById("homepage");
+    a.href = C.HOMEPAGE; a.textContent = C.HOMEPAGE.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    document.getElementById("homepage-zeile").hidden = false;
+  }
+
+  const form = document.getElementById("umfrage");
+  const box = document.getElementById("fragen-box");
+  form.querySelectorAll('input[name="offen"]').forEach(r => r.addEventListener("change", () => {
+    box.hidden = !document.getElementById("offen-ja").checked;
+    if (!box.hidden) document.getElementById("fragen").focus();
+  }));
+
+  const fehler = document.getElementById("fehler");
+  const knopf = document.getElementById("senden");
+  const zeigeFehler = t => { fehler.textContent = t; fehler.hidden = !t; };
+  form.querySelectorAll('input[name="informiert"]').forEach(r => r.addEventListener("change", () => zeigeFehler("")));
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const informiert = form.querySelector('input[name="informiert"]:checked');
+    if (!informiert) { zeigeFehler("Bitte beantworten Sie die erste Frage."); return; }
+    zeigeFehler("");
+    const offen = document.getElementById("offen-ja").checked;
+    const daten = {
+      informiert: informiert.value,
+      offeneFragen: offen,
+      fragen: offen ? document.getElementById("fragen").value.trim() : "",
+      rueckmeldung: document.getElementById("rueckmeldung").value.trim(),
+      website: document.getElementById("website").value
+    };
+
+    knopf.disabled = true; knopf.textContent = "Wird gesendet …";
+    try {
+      if (!demo) {
+        const r = await fetch(C.WORKER_URL.replace(/\/$/, "") + "/rueckmeldung", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(daten)
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.fehler || "Senden fehlgeschlagen");
+      }
+      document.getElementById("infoabend").hidden = !offen;
+      form.hidden = true;
+      document.getElementById("danke").hidden = false;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      zeigeFehler(`${err.message}. Bitte prüfen Sie die Internetverbindung und versuchen Sie es noch einmal.`);
+    } finally {
+      knopf.disabled = false; knopf.textContent = "Absenden";
+    }
+  });
+})();
+</script>
+</body>
+</html>

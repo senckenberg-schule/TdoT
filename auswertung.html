@@ -18,7 +18,7 @@ h1{font-family:var(--display);font-size:clamp(26px,4vw,36px);margin:0;color:var(
 .knopf.zwei{background:var(--weiss);color:var(--blau);border:1.5px solid var(--blau)}
 .hinweis{color:var(--leise);margin:0;max-width:65ch}
 .fehler{color:var(--rot);font-weight:600;margin:0}
-.kennzahl{font-family:var(--display);font-size:20px;color:var(--blau-tief)}
+.kennzahl{font-family:var(--display);font-size:20px;color:var(--blau-tief);margin:0}
 .kennzahl b{font-size:40px;color:var(--blau);font-variant-numeric:tabular-nums;margin-right:6px}
 .raster{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:20px}
 .block{background:var(--weiss);border:1px solid var(--linie);border-radius:20px;padding:20px;min-width:0}
@@ -31,29 +31,42 @@ h1{font-family:var(--display);font-size:clamp(26px,4vw,36px);margin:0;color:var(
 .frei{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto}
 .frei li{background:var(--grund);border-radius:12px;padding:8px 12px;font-size:14px}
 .frei li small{display:block;color:var(--leise);font-size:12px}
+.abschnitt{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;border-top:2px solid var(--linie);padding-top:22px;margin-top:12px}
+.titel2{font-family:var(--display);font-size:24px;margin:0;color:var(--blau-tief)}
+#inhalt{display:flex;flex-direction:column;gap:20px}
+#inhalt[hidden]{display:none}
 </style>
 </head>
 <body>
 <div class="vorschau-hinweis" id="vorschau" hidden>Vorschau mit Beispieldaten</div>
 <main class="rahmen">
   <h1>Auswertung Tag der offenen Tür</h1>
-  <p class="hinweis">Die Rohdaten liegen außerdem in IServ im Ordner TdoT als <b>antworten.csv</b> (öffnet sich in Excel) und <b>daten.json</b>.</p>
+  <p class="hinweis">Die Rohdaten liegen außerdem in IServ im Ordner TdoT: <b>antworten.csv</b> für die Herkunftskarte und <b>rueckmeldungen.csv</b> für die Rückmeldungen. Beide öffnen sich in Excel.</p>
 
   <form class="zeile" id="anmelden">
     <label for="schluessel" class="hinweis">Auswertungs-Schlüssel</label>
     <input class="feld" id="schluessel" type="password" autocomplete="current-password">
     <button class="knopf" type="submit">Anzeigen</button>
-    <button class="knopf zwei" type="button" id="csv" hidden>Als Excel-Tabelle (CSV) laden</button>
   </form>
   <p class="fehler" id="fehler" hidden></p>
 
   <div id="inhalt" hidden>
+    <div class="abschnitt"><h2 class="titel2">Herkunft und Interessen</h2><button class="knopf zwei" type="button" id="csv">Als Excel-Tabelle laden</button></div>
     <p class="kennzahl"><b id="gesamt">0</b>Antworten</p>
     <div class="raster">
       <div class="block"><h2>Woher?</h2><div id="w-ort"></div></div>
       <div class="block"><h2>Wie aufmerksam geworden?</h2><div id="w-quelle"></div></div>
       <div class="block"><h2>Was interessiert am meisten?</h2><div id="w-interesse"></div></div>
       <div class="block"><h2>Freitext-Antworten</h2><ul class="frei" id="w-frei"></ul></div>
+    </div>
+
+    <div class="abschnitt"><h2 class="titel2">Rückmeldungen am Ende des Tages</h2><button class="knopf zwei" type="button" id="csv-r">Als Excel-Tabelle laden</button></div>
+    <p class="kennzahl"><b id="r-gesamt">0</b>Rückmeldungen</p>
+    <div class="raster">
+      <div class="block"><h2>Wie gut informiert?</h2><div id="r-informiert"></div></div>
+      <div class="block"><h2>Offene Fragen?</h2><div id="r-offen"></div></div>
+      <div class="block"><h2>Diese Fragen sind offen geblieben</h2><ul class="frei" id="r-fragen"></ul></div>
+      <div class="block"><h2>Freie Rückmeldungen</h2><ul class="frei" id="r-frei"></ul></div>
     </div>
   </div>
 </main>
@@ -93,7 +106,35 @@ h1{font-family:var(--display);font-size:clamp(26px,4vw,36px);margin:0;color:var(
       ? frei.map(([a, t, o]) => `<li><small>${esc(a)} · ${esc(o)}</small>${esc(t)}</li>`).join("")
       : "<li>Keine Freitext-Antworten</li>";
     document.getElementById("inhalt").hidden = false;
-    document.getElementById("csv").hidden = demo;
+  }
+
+  function zeigeRueckmeldungen(liste) {
+    const zaehle = f => { const z = {}; liste.forEach(e => { const x = f(e); if (x) z[x] = (z[x] || 0) + 1; }); return z; };
+    const uhr = z => new Date(z).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }) + " Uhr";
+    document.getElementById("r-gesamt").textContent = liste.length;
+    // Feste Reihenfolge von "Sehr gut" bis "Noch kaum"
+    const stufen = ["Sehr gut", "Gut", "Teilweise", "Noch kaum"], zi = zaehle(e => e.informiert);
+    const max = Math.max(1, ...stufen.map(s => zi[s] || 0));
+    document.getElementById("r-informiert").innerHTML = stufen.map(s =>
+      `<div class="reihe"><span>${esc(s)}</span><b>${zi[s] || 0}</b><span class="spur"><i style="width:${(zi[s] || 0) / max * 100}%"></i></span></div>`).join("");
+    balken("r-offen", zaehle(e => e.offeneFragen ? "Ja, noch Fragen" : "Nein, alles geklärt"), ["Nein, alles geklärt", "Ja, noch Fragen"], "rot");
+    const fragen = liste.filter(e => e.fragen), frei = liste.filter(e => e.rueckmeldung);
+    document.getElementById("r-fragen").innerHTML = fragen.length
+      ? fragen.map(e => `<li><small>${uhr(e.zeit)}</small>${esc(e.fragen)}</li>`).join("") : "<li>Keine offenen Fragen eingetragen</li>";
+    document.getElementById("r-frei").innerHTML = frei.length
+      ? frei.map(e => `<li><small>${uhr(e.zeit)} · informiert: ${esc(e.informiert)}</small>${esc(e.rueckmeldung)}</li>`).join("") : "<li>Keine freien Rückmeldungen</li>";
+  }
+
+  async function laden(art) {
+    // Bei vielen neuen Antworten holt der Worker sie in Etappen nach, bis alles da ist
+    let j;
+    for (let runde = 0; runde < 15; runde++) {
+      const r = await fetch(basis + "/export" + (art ? "?art=" + art : ""), { headers: { "X-Admin-Key": feld.value } });
+      j = await r.json();
+      if (!r.ok) throw new Error(j.fehler || r.status);
+      if (j.vollstaendig !== false) break;
+    }
+    return j.eintraege;
   }
 
   const fehler = t => { const f = document.getElementById("fehler"); f.textContent = t; f.hidden = !t; };
@@ -102,34 +143,36 @@ h1{font-family:var(--display);font-size:clamp(26px,4vw,36px);margin:0;color:var(
     e.preventDefault(); fehler("");
     if (demo) {
       const bsp = [["Runkel", ["Grundschule"], ["Schulform IGS", "Ganztagsangebote"]], ["Limburg", ["Homepage"], ["iPad-Konzept"]],
-        ["Villmar", ["Freunde oder Bekannte", "Grundschule"], ["Neue Lernkultur"]], ["Runkel", ["Infoabend"], ["Übergang von der Grundschule"]]];
+        ["Villmar", ["Freunde oder Bekannte", "Grundschule"], ["Neue Lernkultur"]], ["Runkel", ["Infoabend"], ["Ganztagsangebote"]]];
       zeige(bsp.map(([ort, quelle, interesse]) => ({ ort, quelle, interesse, quelleFrei: "", interesseFrei: ort === "Limburg" ? "Bläserklasse" : "" })));
+      const t = "2027-01-12T15:20:00Z";
+      zeigeRueckmeldungen([
+        { zeit: t, informiert: "Sehr gut", offeneFragen: false, fragen: "", rueckmeldung: "Tolle Atmosphäre, die Schülerinnen und Schüler haben super erklärt." },
+        { zeit: t, informiert: "Gut", offeneFragen: true, fragen: "Wie läuft die Anmeldung genau ab?", rueckmeldung: "" },
+        { zeit: t, informiert: "Teilweise", offeneFragen: true, fragen: "Welche Wahlpflichtfächer gibt es ab Klasse 7?", rueckmeldung: "Mehr Zeit für Gespräche wäre schön." }]);
       return;
     }
     try {
-      // Bei vielen neuen Antworten holt der Worker sie in Etappen nach, bis alles da ist
-      let j;
-      for (let runde = 0; runde < 15; runde++) {
-        const r = await fetch(basis + "/export", { headers: { "X-Admin-Key": feld.value } });
-        j = await r.json();
-        if (!r.ok) throw new Error(j.fehler || r.status);
-        if (j.vollstaendig !== false) break;
-      }
+      const [herkunft, rueck] = await Promise.all([laden(""), laden("rueckmeldung")]);
       try { sessionStorage.setItem("tdot-key", feld.value); } catch (e) {}
-      zeige(j.eintraege);
+      zeige(herkunft);
+      zeigeRueckmeldungen(rueck);
     } catch (err) { fehler("Laden nicht möglich: " + err.message); }
   });
 
-  document.getElementById("csv").addEventListener("click", async () => {
+  async function csvLaden(art, dateiname) {
+    if (demo) { fehler("In der Vorschau gibt es keine Tabelle zum Herunterladen."); return; }
     try {
-      const r = await fetch(basis + "/export?format=csv", { headers: { "X-Admin-Key": feld.value } });
+      const r = await fetch(basis + "/export?format=csv" + (art ? "&art=" + art : ""), { headers: { "X-Admin-Key": feld.value } });
       if (!r.ok) throw new Error(r.status);
       const url = URL.createObjectURL(await r.blob());
-      const a = Object.assign(document.createElement("a"), { href: url, download: "TdoT-Antworten.csv" });
+      const a = Object.assign(document.createElement("a"), { href: url, download: dateiname });
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     } catch (err) { fehler("Download nicht möglich: " + err.message); }
-  });
+  }
+  document.getElementById("csv").addEventListener("click", () => csvLaden("", "TdoT-Herkunft.csv"));
+  document.getElementById("csv-r").addEventListener("click", () => csvLaden("rueckmeldung", "TdoT-Rueckmeldungen.csv"));
 })();
 </script>
 </body>
