@@ -9,9 +9,9 @@ window.TDOT = {
   WORKER_URL: "https://tdot.stbauer81.workers.dev",
 
   // Markierung der Schule auf der Karte, Mittelpunkt der Entfernungsringe.
-  // Aktuell: Ortsmitte Villmar laut Wikipedia. Für den genauen Schulstandort
-  // die Koordinaten z. B. in OpenStreetMap per Rechtsklick ablesen und hier eintragen.
-  SCHULE: { name: "JCS", lon: 8.192, lat: 50.391 },
+  // Johann-Christian-Senckenberg-Schule Villmar, Ferdinand-Dirichs-Straße 5
+  // (Schulgelände laut OpenStreetMap, abgefragt am 04.11.2026)
+  SCHULE: { name: "JCS Villmar", lon: 8.19197, lat: 50.39889 },
 
   // Orte mit geprüften Koordinaten. Gemeinden: Wikipedia-Infobox (Stand 02.11.2026).
   // Ortsteile von Villmar und Runkel: Wikipedia bzw. Wikidata, abgeglichen mit OpenStreetMap
